@@ -73,7 +73,7 @@
 
 - **已完成**：立项、可行性、竞品、需求、架构、详细设计、接口、安全、计划、风险全套前期文档。
 - **文档质量**：已完成跨文档一致性修订（v0.3），统一性能延迟口径（TTFT P95≤3s / E2E P95≤15s）、文档 ACL 模型（`grantee_type` + `read/download/delete`）、上传 multipart 说明。
-- **项目更名（v0.3）**：原「知行 ZhiXing / ZX-KAP」正式更名为「星枢 Nexus / NKAP」，全库 19 份文档已全局替换并校验无残留。
+- **项目更名（v0.3 / v0.3.1）**：原「知行 ZhiXing / ZX-KAP」正式更名为「星枢 Nexus / NKAP」；v0.3.1 复核发现并清理了此前大小写敏感替换漏掉的小写旧标识符（`zxkap` / `zx-kap` / `zhixing` / `zxk_` → `nkap` / `nexus` / `nkp_`），全库技术内容零残留。
 - **下一步**：进入 Phase 3 开发，先搭最小可运行骨架（Spring Boot 3 + pgvector + 单一模型跑通「上传→提问→带引用回答」闭环），再逐步补齐 LangGraph4j Agent 编排、MCP 工具、评估体系。
 - 详见 [17 给下一个 AI 的开发指引](docs/05-交接与任务/17-给下一个AI的开发指引.md)。
 
