@@ -1,0 +1,126 @@
+# 星枢 Nexus (NKAP) 本地依赖服务
+# 用途：Step 0 开发环境初始化，拉起 PostgreSQL(pgvector) / Redis / RabbitMQ / MinIO
+# 用法：docker compose -f deployments/docker-compose.yml up -d
+# 环境变量：可放置于工作区根目录 .env，未提供时使用下方默认值
+
+name: nkap
+
+services:
+  # ------------------------------------------------------------------
+  # PostgreSQL 16 + pgvector（主库 + 向量库）
+  # ------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: nkap-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nkap}
+      POSTGRES_USER: ${POSTGRES_USER:-nkap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nkap_pass}
+      PGDATA: ${PGDATA:-/var/lib/postgresql/data/pgdata}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - nkap-pgdata:/var/lib/postgresql/data
+    networks:
+      - nkap-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nkap} -d ${POSTGRES_DB:-nkap}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ------------------------------------------------------------------
+  # Redis 7（会话 / 短期记忆缓存）
+  # ------------------------------------------------------------------
+  redis:
+    image: redis:7
+    container_name: nkap-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - nkap-redisdata:/data
+    networks:
+      - nkap-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # RabbitMQ（异步入库 / 任务队列）
+  # ------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: nkap-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"      # AMQP
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672" # 管理控制台
+    volumes:
+      - nkap-rabbitmqdata:/var/lib/rabbitmq
+    networks:
+      - nkap-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ------------------------------------------------------------------
+  # MinIO（对象存储：原始文档 / 解析产物）
+  # ------------------------------------------------------------------
+  minio:
+    image: minio/minio
+    container_name: nkap-minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-nkap}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-nkap123456}
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"     # S3 API
+      - "${MINIO_CONSOLE_PORT:-9001}:9001" # Web 控制台
+    volumes:
+      - nkap-miniodata:/data
+    networks:
+      - nkap-net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+# ------------------------------------------------------------------
+# 统一自定义桥接网络
+# ------------------------------------------------------------------
+networks:
+  nkap-net:
+    name: nkap-net
+    driver: bridge
+
+# ------------------------------------------------------------------
+# 持久化数据卷
+# ------------------------------------------------------------------
+volumes:
+  nkap-pgdata:
+    name: nkap-pgdata
+  nkap-redisdata:
+    name: nkap-redisdata
+  nkap-rabbitmqdata:
+    name: nkap-rabbitmqdata
+  nkap-miniodata:
+    name: nkap-miniodata
